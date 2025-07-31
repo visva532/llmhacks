@@ -1,0 +1,19 @@
+ECHO is on.
+services:
+  - type: web
+    name: hackrx-llm-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port 10000
+    plan: free
+    region: oregon
+    runtime: python
+    branch: main
+    repo: https://github.com/visva532/llmhacks
+    envVars:
+      - key: TEAM_TOKEN
+        value: hackrx2025securetoken
+      - key: OLLAMA_MODEL
+        value: gemma3
+      - key: DEFAULT_POLICY_URL
+        value: https://example.com/default-policy.pdf
