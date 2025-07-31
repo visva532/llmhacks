@@ -13,17 +13,17 @@ DEFAULT_POLICY_URL = os.getenv("DEFAULT_POLICY_URL")
 
 app = FastAPI()
 
-# For Render's health check
+# === Health check for Render ===
 @app.get("/healthz")
 def health_check():
     return {"status": "ok"}
 
-# Define expected request format
+# === Request Body Schema ===
 class HackRxRequest(BaseModel):
     documents: list[str]
     questions: list[str]
 
-# Preload default document if specified
+# === Optional preload policy on startup ===
 @app.on_event("startup")
 def preload_default():
     if DEFAULT_POLICY_URL:
@@ -40,15 +40,15 @@ def preload_default():
         except Exception as e:
             print(f"[ERROR] Error during default preload: {e}")
 
-# Main POST endpoint for question answering
+# === Main API endpoint ===
 @app.post("/hackrx/run")
 async def hackrx_run(req: Request, payload: HackRxRequest):
-    # Authorization check
+    # --- Authorization ---
     auth_header = req.headers.get("Authorization")
     if auth_header != f"Bearer {TEAM_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Process each provided document
+    # --- Document Chunking ---
     for doc_url in payload.documents:
         pdf_path = "temp.pdf"
         try:
@@ -61,9 +61,8 @@ async def hackrx_run(req: Request, payload: HackRxRequest):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
 
+    # --- Answer Generation ---
     answers = []
-
-    # Answer each question using top retrieved chunks
     for q in payload.questions:
         top_chunks = []
         for doc_url in payload.documents:
@@ -93,7 +92,7 @@ async def hackrx_run(req: Request, payload: HackRxRequest):
 
     return {"answers": answers}
 
-# Entry point (only for local development, Render ignores this)
+# === Local development entry point ===
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
