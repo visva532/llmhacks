@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Environment & Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Data/Generated Files
+document_chunks.json
+
+# Virtual Environment
+venv/
+env/

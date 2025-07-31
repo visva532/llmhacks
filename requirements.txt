@@ -1,0 +1,28 @@
+# === Core FastAPI Setup ===
+fastapi==0.116.1
+uvicorn==0.35.0
+pydantic==2.11.7
+python-dotenv==1.1.1
+requests==2.32.4
+
+# === Ollama LLM Integration ===
+ollama==0.5.1
+
+# === Pinecone for Retrieval ===
+pinecone==7.3.0
+
+# === PDF / Doc Parsing & Chunking ===
+PyMuPDF==1.26.3
+python-docx==1.2.0
+beautifulsoup4==4.13.4
+lxml==6.0.0
+
+# === NLP & Embedding Tools ===
+sentence-transformers==5.0.0
+scikit-learn==1.7.1
+numpy==2.3.2
+scipy==1.16.0
+tqdm==4.67.1
+
+# === Optional for Better Console & Debug ===
+rich==14.1.0
