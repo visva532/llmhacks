@@ -6,16 +6,24 @@ from pydantic import BaseModel
 from loader.chunker import chunk_document
 from retriever.pinecone_store import query_chunks
 
+# Load environment variables or use default fallback values
 TEAM_TOKEN = os.getenv("TEAM_TOKEN", "hackrx2025securetoken")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3")
 DEFAULT_POLICY_URL = os.getenv("DEFAULT_POLICY_URL")
 
 app = FastAPI()
 
+# Data model for POST request body
 class HackRxRequest(BaseModel):
     documents: list[str]
     questions: list[str]
 
+# Health check endpoint for Render deployment
+@app.get("/healthz")
+def health_check():
+    return {"status": "ok"}
+
+# Load default policy document at startup if specified
 @app.on_event("startup")
 def preload_default():
     if DEFAULT_POLICY_URL:
@@ -32,12 +40,15 @@ def preload_default():
         except Exception as e:
             print(f"[ERROR] Error during default preload: {e}")
 
+# Main API endpoint for answering questions
 @app.post("/hackrx/run")
 async def hackrx_run(req: Request, payload: HackRxRequest):
+    # Check Authorization header
     auth_header = req.headers.get("Authorization")
     if auth_header != f"Bearer {TEAM_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    # Process all provided documents
     for doc_url in payload.documents:
         pdf_path = "temp.pdf"
         try:
@@ -52,6 +63,7 @@ async def hackrx_run(req: Request, payload: HackRxRequest):
 
     answers = []
 
+    # Query chunks and answer each question
     for q in payload.questions:
         top_chunks = []
         for doc_url in payload.documents:
@@ -81,7 +93,7 @@ async def hackrx_run(req: Request, payload: HackRxRequest):
 
     return {"answers": answers}
 
-# For local development or Render hosting
+# Only runs locally (Render ignores this)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000)
