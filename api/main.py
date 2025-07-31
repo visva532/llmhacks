@@ -6,69 +6,65 @@ from pydantic import BaseModel
 from loader.chunker import chunk_document
 from retriever.pinecone_store import query_chunks
 
-# Load environment variables or use default fallback values
+# Load environment variables
 TEAM_TOKEN = os.getenv("TEAM_TOKEN", "hackrx2025securetoken")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3")
 DEFAULT_POLICY_URL = os.getenv("DEFAULT_POLICY_URL")
 
 app = FastAPI()
 
-# Data model for POST request body
-class HackRxRequest(BaseModel):
-    documents: list[str]
-    questions: list[str]
-
-# Health check endpoint for Render deployment
+# Health check for Render
 @app.get("/healthz")
 def health_check():
     return {"status": "ok"}
 
-# Load default policy document at startup if specified
+# Request body format
+class HackRxRequest(BaseModel):
+    documents: list[str]
+    questions: list[str]
+
+# Load default policy at startup
 @app.on_event("startup")
 def preload_default():
     if DEFAULT_POLICY_URL:
         try:
-            pdf_path = "default.pdf"
             r = requests.get(DEFAULT_POLICY_URL)
             if r.status_code == 200:
-                with open(pdf_path, "wb") as f:
+                with open("default.pdf", "wb") as f:
                     f.write(r.content)
-                chunk_document(pdf_path, namespace="default_policy")
+                chunk_document("default.pdf", namespace="default_policy")
                 print("[INFO] Default policy loaded and chunked.")
             else:
-                print(f"[WARN] Failed to preload default policy. Status: {r.status_code}")
+                print(f"[WARN] Failed to load default policy: {r.status_code}")
         except Exception as e:
-            print(f"[ERROR] Error during default preload: {e}")
+            print(f"[ERROR] During default preload: {e}")
 
-# Main API endpoint for answering questions
+# Main endpoint for question answering
 @app.post("/hackrx/run")
 async def hackrx_run(req: Request, payload: HackRxRequest):
-    # Check Authorization header
+    # Check auth token
     auth_header = req.headers.get("Authorization")
     if auth_header != f"Bearer {TEAM_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Process all provided documents
+    # Process uploaded documents
     for doc_url in payload.documents:
-        pdf_path = "temp.pdf"
         try:
             r = requests.get(doc_url)
             if r.status_code != 200:
-                raise HTTPException(status_code=400, detail=f"Failed to download: {doc_url}")
-            with open(pdf_path, "wb") as f:
+                raise HTTPException(status_code=400, detail=f"Failed to download {doc_url}")
+            with open("temp.pdf", "wb") as f:
                 f.write(r.content)
-            chunk_document(pdf_path, namespace=doc_url)
+            chunk_document("temp.pdf", namespace=doc_url)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Document error: {str(e)}")
 
+    # Generate answers
     answers = []
-
-    # Query chunks and answer each question
     for q in payload.questions:
         top_chunks = []
         for doc_url in payload.documents:
             top_chunks.extend(query_chunks(q, top_k=3, namespace=doc_url))
-
         context = "\n".join([m["metadata"]["text"] for m in top_chunks])
 
         prompt = (
@@ -85,15 +81,15 @@ async def hackrx_run(req: Request, payload: HackRxRequest):
                     {"role": "user", "content": prompt}
                 ]
             )
-            answer_text = response["message"]["content"].strip()
+            answer = response["message"]["content"].strip()
         except Exception as e:
-            answer_text = f"[Error from LLM]: {str(e)}"
+            answer = f"[Error from LLM]: {str(e)}"
 
-        answers.append(answer_text)
+        answers.append(answer)
 
     return {"answers": answers}
 
-# Only runs locally (Render ignores this)
+# Only for local testing
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
